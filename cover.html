@@ -1,0 +1,143 @@
+<!DOCTYPE html>
+<html lang="zh">
+<head>
+<meta charset="UTF-8">
+<title>封面生成器 · Cover Generator</title>
+<style>
+  body{margin:0;background:#0d0f14;color:#e8ecf3;
+    font-family:-apple-system,"PingFang SC",system-ui,sans-serif;
+    display:flex;flex-direction:column;align-items:center;gap:14px;padding:24px}
+  h1{font-size:16px;font-weight:600;margin:0;color:#9aa6b8}
+  #cv{border-radius:12px;box-shadow:0 8px 40px #0009;width:630px;height:500px}
+  .row{display:flex;gap:10px;flex-wrap:wrap;justify-content:center}
+  button{font-family:inherit;font-size:14px;padding:9px 16px;border:none;border-radius:9px;
+    background:#1e2430;color:#e8ecf3;cursor:pointer}
+  button.primary{background:#4ea1ff;color:#04121f;font-weight:700}
+  .hint{font-size:12px;color:#6b7686;max-width:630px;text-align:center;line-height:1.6}
+</style>
+</head>
+<body>
+<h1>封面生成器 —— 630×500，导出 2 倍图</h1>
+<canvas id="cv" width="1260" height="1000"></canvas>
+<div class="row">
+  <button class="primary" id="dl">⬇ 下载 PNG</button>
+  <button id="shuffle">🎲 换一批角色</button>
+  <button id="theme">🌗 切换亮/暗</button>
+</div>
+<p class="hint">角色配色与图腾直接读取 <code>characters/*.js</code>，与游戏永远一致。<br>
+不满意就点「换一批」，满意了点「下载 PNG」，itch.io 的 Cover image 直接传这张。</p>
+
+<!-- 复用真实的图腾库与角色数据（用空实现顶掉引擎函数） -->
+<script src="js/emblems.js"></script>
+<script>
+  const ROSTER=[];
+  function registerHero(h){ ROSTER.push(h); }
+  function registerSkill(){} function registerMap(){} function registerMechanic(){}
+</script>
+<!-- 角色列表读同一个 manifest.js，和游戏永远一致，加角色不用改这个文件 -->
+<script src="manifest.js"></script>
+<script>
+  (window.GAME.characters||[]).forEach(function(n){
+    document.write('<scr'+'ipt src="characters/'+n+'.js"><\/scr'+'ipt>');
+  });
+</script>
+
+<script>
+const cv=document.getElementById('cv'), g=cv.getContext('2d');
+const W=630, H=500;                       // 逻辑尺寸（画布是 2 倍）
+let dark=true, picks=[];
+
+function palette(){ return dark
+  ? {bg1:'#0e1118', bg2:'#161b26', grid:'#1b2230', edge:'#2f3a4d', title:'#ffffff', sub:'#9aa6b8', foot:'#7f8ba0'}
+  : {bg1:'#f4f7fc', bg2:'#e6ecf6', grid:'#dde4ef', edge:'#b9c2d0', title:'#101623', sub:'#4c586b', foot:'#66738a'}; }
+
+function pickHeroes(n){
+  const pool=ROSTER.filter(c=>c.color&&c.emblem);
+  const out=[];
+  const copy=pool.slice();
+  for(let i=copy.length-1;i>0;i--){const j=Math.floor(Math.random()*(i+1));[copy[i],copy[j]]=[copy[j],copy[i]];}
+  for(let i=0;i<Math.min(n,copy.length);i++) out.push(copy[i]);
+  return out;
+}
+
+function drawBall(c, x, y, r, teamColor){
+  g.beginPath(); g.arc(x,y,r,0,6.283);
+  g.fillStyle=c.color; g.fill();
+  g.strokeStyle=teamColor; g.lineWidth=r*0.16; g.stroke();
+  drawEmblem(g, c.emblem, x, y, r*0.62, 'rgba(14,17,24,.82)');
+}
+
+function render(){
+  const P=palette();
+  g.setTransform(2,0,0,2,0,0);                 // 2 倍绘制
+  // 背景
+  const grd=g.createLinearGradient(0,0,W,H);
+  grd.addColorStop(0,P.bg1); grd.addColorStop(1,P.bg2);
+  g.fillStyle=grd; g.fillRect(0,0,W,H);
+  // 网格
+  g.strokeStyle=P.grid; g.lineWidth=1;
+  for(let x=0;x<W;x+=30){ g.beginPath(); g.moveTo(x,0); g.lineTo(x,H); g.stroke(); }
+  for(let y=0;y<H;y+=30){ g.beginPath(); g.moveTo(0,y); g.lineTo(W,y); g.stroke(); }
+  // 竞技场边框
+  g.strokeStyle=P.edge; g.lineWidth=2;
+  g.beginPath(); g.roundRect(14,14,W-28,H-28,14); g.stroke();
+
+  // 战斗特效：爆炸环 + 连锁闪电（让封面像"正在打"）
+  g.beginPath(); g.arc(196,300,74,0,6.283);
+  g.fillStyle='rgba(255,150,70,.13)'; g.fill();
+  g.strokeStyle='rgba(255,190,110,.5)'; g.lineWidth=3; g.stroke();
+  g.strokeStyle='rgba(150,215,255,.75)'; g.lineWidth=3; g.lineCap='round';
+  g.beginPath(); g.moveTo(372,246); g.lineTo(408,286); g.lineTo(392,292); g.lineTo(436,330); g.stroke();
+
+  // 角色球：一条起伏的弧线排布
+  const ys=[268,232,300,244,286,238,296];
+  const rs=[34,27,30,25,32,24,28];
+  picks.forEach((c,i)=>{
+    const x=88+i*76, y=ys[i%ys.length], r=rs[i%rs.length];
+    drawBall(c, x, y, r, i%2 ? '#ff5a6a' : '#4ea1ff');
+  });
+
+  // 飘伤害数字
+  g.font='bold 15px sans-serif'; g.textAlign='center';
+  [[150,232,'-29'],[330,214,'-46'],[470,262,'-17']].forEach(([x,y,t])=>{
+    g.lineWidth=3; g.strokeStyle='rgba(8,10,16,.8)'; g.strokeText(t,x,y);
+    g.fillStyle='rgba(255,225,120,.95)'; g.fillText(t,x,y);
+  });
+
+  // 标题
+  g.textAlign='center';
+  g.fillStyle=P.title; g.font='bold 52px -apple-system,"PingFang SC",system-ui,sans-serif';
+  g.fillText('超时空对战', W/2, 108);
+  g.fillStyle=P.sub; g.font='600 17px system-ui,sans-serif';
+  const en='C R O S S - D I M E N S I O N   D U E L';
+  g.fillText(en, W/2, 138);
+
+  // 底部信息条
+  g.fillStyle= dark ? 'rgba(8,10,16,.55)' : 'rgba(255,255,255,.6)';
+  g.beginPath(); g.roundRect(14,H-86,W-28,72,12); g.fill();
+  g.fillStyle=P.title; g.font='bold 22px system-ui,sans-serif';
+  g.fillText('25 HEROES · 25 MECHANICS · 8 ARENAS', W/2, H-52);
+  g.fillStyle=P.foot; g.font='14px -apple-system,"PingFang SC",system-ui,sans-serif';
+  g.fillText('25 位网文主角，每人一种独有机制 · 自动对战 / 锦标赛 / 双人PvP', W/2, H-29);
+}
+
+function reroll(){ picks=pickHeroes(7); render(); }
+document.getElementById('shuffle').onclick=reroll;
+document.getElementById('theme').onclick=()=>{ dark=!dark; render(); };
+document.getElementById('dl').onclick=()=>{
+  const a=document.createElement('a');
+  a.download='cover-630x500@2x.png';
+  a.href=cv.toDataURL('image/png');
+  a.click();
+};
+// roundRect 兜底（老浏览器）
+if(!CanvasRenderingContext2D.prototype.roundRect){
+  CanvasRenderingContext2D.prototype.roundRect=function(x,y,w,h,r){
+    this.beginPath(); this.moveTo(x+r,y); this.arcTo(x+w,y,x+w,y+h,r);
+    this.arcTo(x+w,y+h,x,y+h,r); this.arcTo(x,y+h,x,y,r); this.arcTo(x,y,x+w,y,r);
+    this.closePath(); return this; };
+}
+reroll();
+</script>
+</body>
+</html>

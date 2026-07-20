@@ -1,0 +1,219 @@
+<!DOCTYPE html>
+<html lang="zh">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>超时空对战 · V2</title>
+<link rel="icon" href="figures/favicon-64.png">
+<style>
+  :root{
+    --bg:#0d0f14; --panel:#161a23; --panel2:#1e2430; --line:#2a3242;
+    --txt:#e8ecf3; --dim:#9aa6b8; --accent:#4ea1ff; --red:#ff5a6a; --gold:#ffcf5a;
+  }
+  :root[data-theme="light"]{
+    --bg:#f6f8fc; --panel:#ffffff; --panel2:#eef2f8; --line:#d3dae6;
+    --txt:#141922; --dim:#5c6879; --accent:#1f6fd0; --red:#d6394b; --gold:#a9760a;
+  }
+  :root[data-theme="light"] .team{ background:#e7ecf4 }
+  :root[data-theme="light"] .b{ background:#e7ecf4 }
+  :root[data-theme="light"] #arena{ background:#f2f5fa }
+  *{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+  html,body{margin:0;height:100%;background:var(--bg);color:var(--txt);
+    font-family:-apple-system,"PingFang SC","Microsoft YaHei",system-ui,sans-serif}
+  #app{max-width:960px;margin:0 auto;padding:14px;position:relative}
+  #gear{position:absolute;top:12px;right:14px;font-size:18px;padding:6px 10px;line-height:1;border-radius:10px}
+  #testpanel{display:none;position:fixed;inset:0;background:rgba(0,0,0,.62);z-index:50;align-items:center;justify-content:center}
+  #testpanel .box{background:var(--panel);border:1px solid var(--line);border-radius:14px;padding:18px;max-width:540px;width:92%;max-height:86vh;overflow:auto}
+  #testpanel h2{margin:0 0 6px;font-size:17px}
+  #testresults table{width:100%;border-collapse:collapse;margin-top:8px;font-size:13px}
+  #testresults th,#testresults td{padding:5px 8px;border-bottom:1px solid var(--line);text-align:left}
+  #testresults th{color:var(--dim);font-weight:600}
+  #testresults .bar{height:8px;background:var(--accent);border-radius:4px;min-width:2px}
+  h1{font-size:18px;margin:4px 0 12px;letter-spacing:1px}
+  .muted{color:var(--dim)}
+  button{font-family:inherit;cursor:pointer;border:none;border-radius:10px;
+    background:var(--panel2);color:var(--txt);padding:8px 14px;font-size:14px}
+  button:disabled{opacity:.4;cursor:not-allowed}
+  .primary{background:var(--accent);color:#04121f;font-weight:700}
+  .row{display:flex;gap:12px}
+  /* ---------- 选人界面 ---------- */
+  #select{display:flex;flex-direction:column;gap:12px}
+  .picker{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+  .side{background:var(--panel);border:1px solid var(--line);border-radius:14px;
+    padding:10px;display:flex;flex-direction:column;min-height:0}
+  .side.L{border-top:3px solid var(--accent)}
+  .side.R{border-top:3px solid var(--red)}
+  .side h2{font-size:14px;margin:2px 4px 8px;display:flex;justify-content:space-between}
+  .search{width:100%;padding:8px 10px;border-radius:9px;border:1px solid var(--line);
+    background:var(--panel2);color:var(--txt);font-size:13px;margin-bottom:8px}
+  .team{display:flex;flex-wrap:wrap;gap:5px;min-height:26px;margin-bottom:8px;padding:4px;
+    background:#0f1622;border:1px dashed var(--line);border-radius:9px}
+  .team:empty::before{content:'队伍为空';color:var(--dim);font-size:11px;padding:2px 4px}
+  .chip{font-size:12px;padding:3px 8px;border-radius:8px;background:var(--panel2);border:1px solid var(--line);cursor:pointer}
+  .chip:hover{border-color:var(--red);color:var(--red)}
+  .side.L .chip{border-left:3px solid var(--accent)}
+  .side.R .chip{border-left:3px solid var(--red)}
+  .list{overflow-y:auto;max-height:40vh;display:flex;flex-direction:column;gap:8px;padding-right:2px}
+  .card{background:var(--panel2);border:1px solid var(--line);border-radius:11px;
+    padding:9px 10px;cursor:pointer;transition:.12s}
+  .card:hover{border-color:var(--dim)}
+  .card.sel{outline:2px solid var(--accent);background:#1b2740}
+  .side.R .card.sel{outline-color:var(--red);background:#2a1b20}
+  .card .nm{font-weight:700;font-size:15px}
+  .card .src{font-size:11px;color:var(--dim);margin-left:6px}
+  .badges{display:flex;flex-wrap:wrap;gap:4px;margin:6px 0}
+  .b{font-size:10px;padding:2px 6px;border-radius:6px;background:#0f1622;color:var(--dim);border:1px solid var(--line)}
+  .desc{font-size:11px;color:var(--dim);line-height:1.4}
+  .wr{font-size:10px;margin-top:5px;color:var(--gold)}
+  .controls{display:flex;flex-wrap:wrap;gap:10px;align-items:center;justify-content:center;
+    background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:10px}
+  .stepper{display:flex;align-items:center;gap:6px}
+  .stepper button{padding:4px 12px;font-size:16px}
+  .toggle{display:flex;align-items:center;gap:6px;font-size:13px;color:var(--dim)}
+  /* ---------- 战斗界面 ---------- */
+  #battle{display:none;flex-direction:column;align-items:center;gap:10px}
+  #arena{background:#090b10;border-radius:14px;border:1px solid var(--line);touch-action:none}
+  #hud{display:flex;gap:10px;align-items:center}
+  #result{display:none;flex-direction:column;align-items:center;gap:10px;
+    background:var(--panel);border:1px solid var(--line);border-radius:14px;padding:18px;margin-top:6px}
+  #result h2{margin:0;font-size:22px}
+</style>
+</head>
+<body>
+<div id="app">
+  <h1 data-zh="超时空对战 <span class='muted'>· V2</span>" data-en="Cross-Dim Duel <span class='muted'>· V2</span>">超时空对战 <span class="muted">· V2</span></h1>
+  <button id="gear" title="强度测试台">⚙️</button>
+  <button id="theme" title="亮色/暗色" style="position:absolute;top:12px;right:104px;font-size:15px;padding:6px 10px;border-radius:10px">🌙</button>
+  <button id="lang" title="中/EN" style="position:absolute;top:12px;right:58px;font-size:13px;padding:6px 10px;border-radius:10px">EN</button>
+
+  <!-- ============ 强度测试台 ============ -->
+  <div id="testpanel"><div class="box">
+    <h2 data-zh="⚙️ 强度测试台" data-en="⚙️ Power Test Lab"></h2>
+    <div class="muted" style="font-size:12px;line-height:1.5" data-zh="每个角色与其他所有角色对打 N 遍（轮流先后手），后台极速跑完并排出强度榜。遍数越多越稳（3 遍纯噪声）。<b style='color:var(--gold)'>独立计分，不影响你的正式胜率数据。</b>" data-en="Every hero fights every other N times (alternating sides), run instantly in the background into a power ranking. More runs = more stable (3 is pure noise). <b style='color:var(--gold)'>Scored separately — does not touch your real win-rate data.</b>"></div>
+    <div class="row" style="margin:10px 0 4px;gap:6px;align-items:center;flex-wrap:wrap">
+      <span class="muted" style="font-size:12px" data-zh="对战规模" data-en="Team size"></span>
+      <button id="tsMinus">−</button>
+      <b id="tsVal" style="min-width:34px;text-align:center">1v1</b>
+      <button id="tsPlus">+</button>
+      <span class="muted" style="font-size:11px" data-zh="(每方同角色 N 个)" data-en="(N copies per side)"></span>
+    </div>
+    <div class="row" style="margin:4px 0 12px;gap:8px;align-items:center;flex-wrap:wrap">
+      <span class="muted" style="font-size:12px" data-zh="每对打：" data-en="Runs/pair:"></span>
+      <button class="rep primary" data-n="10" data-zh="10遍" data-en="×10"></button>
+      <button class="rep primary" data-n="20" data-zh="20遍" data-en="×20"></button>
+      <button class="rep primary" data-n="100" data-zh="100遍" data-en="×100"></button>
+      <button id="closetest" data-zh="关闭" data-en="Close"></button>
+      <span class="muted" id="testprog"></span>
+    </div>
+    <div id="testresults"></div>
+    <div class="row" id="testexport" style="display:none;gap:8px;margin-top:10px">
+      <button id="copytest" data-zh="复制结果" data-en="Copy result"></button>
+      <button id="exporttest" data-zh="导出为文件" data-en="Export file"></button>
+    </div>
+  </div></div>
+
+  <!-- ============ 选人界面 ============ -->
+  <div id="select">
+    <div class="picker">
+      <div class="side L">
+        <h2><span data-zh="左方队伍" data-en="Left Team">左方队伍</span> <span class="muted" id="lpick"></span></h2>
+        <div class="team" id="lteam"></div>
+        <input class="search" id="lsearch" data-zh="搜索名字…" data-en="Search name…" placeholder="搜索名字…">
+        <div class="list" id="llist"></div>
+      </div>
+      <div class="side R">
+        <h2><span data-zh="右方队伍" data-en="Right Team">右方队伍</span> <span class="muted" id="rpick"></span></h2>
+        <div class="team" id="rteam"></div>
+        <input class="search" id="rsearch" data-zh="搜索名字…" data-en="Search name…" placeholder="搜索名字…">
+        <div class="list" id="rlist"></div>
+      </div>
+    </div>
+    <div class="controls" style="gap:8px">
+      <span class="muted" style="font-size:12px" data-zh="地图：" data-en="Map:"></span>
+      <div id="maplist" style="display:flex;gap:6px;flex-wrap:wrap"></div>
+      <span class="muted" id="mapdesc" style="font-size:11px;flex-basis:100%;text-align:center"></span>
+    </div>
+    <div class="controls">
+      <span class="muted" style="font-size:12px" data-zh="点英雄卡加入本方队伍（可重复、可混不同英雄）；点队伍里的名字移除" data-en="Click hero cards to add to your team (repeats & mixes allowed); click a name in the team to remove"></span>
+      <label class="toggle"><input type="checkbox" id="ctrlmode"> <span data-zh="操控模式（你控左方首位·WASD移动·J放技能）" data-en="Control (you drive Left's first · WASD move · J skill)"></span></label>
+      <label class="toggle"><input type="checkbox" id="recmode"> <span data-zh="录制模式（隐藏UI·大字名·飘伤害·开场卡）" data-en="Record mode (hide UI · big names · damage numbers · title card)"></span></label>
+      <button id="tourney" data-zh="🏆 锦标赛" data-en="🏆 Tournament"></button>
+      <select id="tourmode" style="background:var(--panel2);color:var(--txt);border:1px solid var(--line);border-radius:9px;padding:7px;font-size:13px;font-family:inherit">
+        <option value="close" data-zh="势均力敌（场场有悬念·推荐）" data-en="Closest matchups (always tense · recommended)"></option>
+        <option value="random" data-zh="纯随机抽签" data-en="Random draw"></option>
+        <option value="seed" data-zh="强弱分区（前期易碾压）" data-en="Seeded (early blowouts)"></option>
+      </select>
+      <label class="toggle"><input type="checkbox" id="pvpmode"> <span data-zh="本地PvP双人（左WASD+J / 右方向键+/）" data-en="Local PvP (L: WASD+J / R: arrows + / )"></span></label>
+      <button id="clearL" data-zh="清空左" data-en="Clear L"></button>
+      <button id="clearR" data-zh="清空右" data-en="Clear R"></button>
+      <button id="resetstats" data-zh="重置胜率数据" data-en="Reset stats"></button>
+      <button class="primary" id="start" data-zh="开始对战" data-en="Start" disabled></button>
+    </div>
+    <div class="controls" style="flex-direction:column;align-items:stretch;gap:8px">
+      <div class="row" style="justify-content:center;flex-wrap:wrap;gap:8px">
+        <span class="muted" style="align-self:center;font-size:12px" data-zh="胜率数据：" data-en="Win-rate data:"></span>
+        <button id="copystats" data-zh="复制JSON" data-en="Copy JSON"></button>
+        <button id="exportstats" data-zh="导出为文件" data-en="Export file"></button>
+        <button id="importbtn" data-zh="导入" data-en="Import"></button>
+        <button id="toggleraw" data-zh="查看原始" data-en="Raw"></button>
+        <input type="file" id="importfile" accept="application/json,.json" style="display:none">
+      </div>
+      <textarea id="rawstats" readonly spellcheck="false"
+        style="display:none;height:120px;width:100%;background:var(--panel2);color:var(--dim);
+        border:1px solid var(--line);border-radius:9px;padding:8px;font-family:ui-monospace,monospace;font-size:12px"></textarea>
+    </div>
+  </div>
+
+  <!-- ============ 战斗界面 ============ -->
+  <div id="battle">
+    <canvas id="arena" width="400" height="600"></canvas>
+    <div id="hud">
+      <button id="pause" data-zh="暂停" data-en="Pause"></button>
+      <button id="speed">倍速 ×1</button>
+      <button id="back" data-zh="返回选人" data-en="Back"></button>
+      <span class="muted" id="speedhint">空格暂停 · 数字键1/2/4/8切倍速</span>
+    </div>
+  </div>
+
+  <!-- ============ 结算 ============ -->
+  <div id="result">
+    <h2 id="winnerText"></h2>
+    <div class="muted" id="statLine"></div>
+    <!-- 锦标赛结束后在这里画完整对阵树；平时隐藏 -->
+    <div id="bracketBox" style="display:none;margin:14px 0 4px;max-width:100%;overflow:auto;">
+      <canvas id="bracket"></canvas>
+    </div>
+    <div class="row">
+      <button class="primary" id="rematch" data-zh="再战" data-en="Rematch"></button>
+      <button id="rechoose" data-zh="换人" data-en="Reselect"></button>
+      <button id="dlbracket" style="display:none" data-zh="⬇ 存对阵树" data-en="⬇ Save bracket"></button>
+    </div>
+  </div>
+</div>
+
+<!-- 引擎核心（这两个文件名固定，永不变，所以保持静态标签） -->
+<script src="js/emblems.js"></script>
+<script src="js/engine.js"></script>
+
+<!-- 内容清单：加角色/地图/机制只改 manifest.js，本文件永久不用动 -->
+<script src="manifest.js"></script>
+
+<!-- 统一加载器 ==========================================================
+     把 manifest.js 里列出的机制/地图/角色，按顺序写成经典 <script> 标签。
+     用 document.write 是刻意选择：它在页面解析期插入的就是静态 <script> 标签，
+     和以前一行行手写的标签逐字等价——所以 file://（双击打开）下零兼容性风险。
+     （动态 createElement 注入在部分浏览器 file:// 下会失败=白屏，故不用。）
+     加载顺序：emblems→engine→机制→地图→角色→boot()。
+     ==================================================================== -->
+<script>
+(function(){
+  function tag(src){ document.write('<scr'+'ipt src="'+src+'"><\/scr'+'ipt>'); }
+  var G = window.GAME || {};
+  (G.mechanics  || []).forEach(function(n){ tag('mechanics/'+n+'.js'); });
+  (G.maps       || []).forEach(function(n){ tag('maps/'+n+'.js'); });
+  (G.characters || []).forEach(function(n){ tag('characters/'+n+'.js'); });
+  document.write('<scr'+'ipt>boot()<\/scr'+'ipt>');
+})();
+</script>
+</body>
+</html>

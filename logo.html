@@ -1,0 +1,265 @@
+<!DOCTYPE html>
+<html lang="zh">
+<head>
+<meta charset="utf-8">
+<title>超时空对战 · Logo 生成器</title>
+<style>
+  body{margin:0;padding:28px;background:#0b0d12;color:#e6ebf5;
+       font-family:-apple-system,"PingFang SC","Helvetica Neue",sans-serif;}
+  h1{font-size:19px;margin:0 0 4px;font-weight:700;}
+  p.sub{margin:0 0 22px;color:#7f8ba1;font-size:13px;line-height:1.6;}
+  .row{display:flex;flex-wrap:wrap;gap:26px;align-items:flex-start;}
+  .card{background:#141824;border:1px solid #242c3d;border-radius:14px;padding:16px;}
+  .card h2{font-size:13px;margin:0 0 10px;color:#9aa6bd;font-weight:600;letter-spacing:.04em;}
+  canvas{display:block;border-radius:8px;background:#000;}
+  .btns{margin-top:12px;display:flex;gap:8px;flex-wrap:wrap;}
+  button{background:#5b6dfa;color:#fff;border:0;border-radius:8px;
+         padding:8px 14px;font-size:13px;font-weight:600;cursor:pointer;}
+  button.alt{background:#2a3346;}
+  button:hover{filter:brightness(1.12);}
+  .note{margin-top:26px;color:#6c7891;font-size:12.5px;line-height:1.75;max-width:760px;}
+  code{background:#1d2432;padding:1px 6px;border-radius:4px;color:#9fb0d0;}
+</style>
+</head>
+<body>
+
+<h1>超时空对战 · Logo 生成器</h1>
+<p class="sub">
+  图腾和配色直接从 <code>js/emblems.js</code> + <code>characters/*.js</code> 读，永远和游戏里一致。<br>
+  点「换一组角色」可以换 logo 里那两个球是谁。
+</p>
+
+<div class="row">
+
+  <div class="card">
+    <h2>方形图标 / APP ICON &nbsp;— 512×512</h2>
+    <canvas id="icon" width="512" height="512" style="width:256px;height:256px;"></canvas>
+    <div class="btns">
+      <button onclick="dl('icon','logo-512.png')">⬇ 下载 512</button>
+      <button class="alt" onclick="dl('icon','logo-1024.png',2)">⬇ 下载 1024</button>
+    </div>
+  </div>
+
+  <div class="card">
+    <h2>横版字标 / WORDMARK &nbsp;— 1200×400</h2>
+    <canvas id="mark" width="1200" height="400" style="width:600px;height:200px;"></canvas>
+    <div class="btns">
+      <button onclick="dl('mark','logo-wordmark.png')">⬇ 下载字标</button>
+    </div>
+  </div>
+
+  <div class="card">
+    <h2>网站图标 / FAVICON &nbsp;— 64×64</h2>
+    <canvas id="fav" width="64" height="64" style="width:64px;height:64px;image-rendering:pixelated;"></canvas>
+    <div class="btns">
+      <button onclick="dl('fav','favicon-64.png')">⬇ 下载 favicon</button>
+    </div>
+  </div>
+
+</div>
+
+<div class="btns" style="margin-top:22px;">
+  <button class="alt" onclick="reroll()">🎲 换一组角色</button>
+  <button class="alt" onclick="THEME_LIGHT=!THEME_LIGHT;drawAll()">🌗 切换亮/暗底</button>
+</div>
+
+<div class="note">
+  <b>怎么用：</b>
+  512 传 itch.io 的「Cover image」旁边那个用不上，itch 没有独立 icon 位——这张主要给 GitHub 社交预览、
+  B站/视频号头像、以及以后打包成 App 用。<br>
+  <b>favicon：</b>下载后放进项目根目录，在 <code>index.html</code> 的 <code>&lt;head&gt;</code> 里加一行
+  <code>&lt;link rel="icon" href="favicon-64.png"&gt;</code>，浏览器标签页就有图标了。<br>
+  <b>字标：</b>适合当视频封面的标题层、或 GitHub README 顶部的横幅。
+</div>
+
+<!-- 复用游戏本体的图腾和角色配色，保证 logo 和游戏永远不会脱节 -->
+<script>
+  // 顶掉引擎的注册函数，这样角色文件可以被单独加载而不需要整个引擎
+  const ROSTER = [];
+  function registerHero(h){ ROSTER.push(h); }
+  function registerSkill(){}
+  function registerMap(){}
+  function registerMechanic(){}
+</script>
+<script src="js/emblems.js"></script>
+<!-- 角色列表读同一个 manifest.js，加角色不用改这个文件 -->
+<script src="manifest.js"></script>
+<script>
+  (window.GAME.characters||[]).forEach(function(n){
+    document.write('<scr'+'ipt src="characters/'+n+'.js"><\/scr'+'ipt>');
+  });
+</script>
+
+<script>
+let THEME_LIGHT = false;
+let PICK = [];
+
+function roundRect(c,x,y,w,h,r){
+  if(c.roundRect){ c.beginPath(); c.roundRect(x,y,w,h,r); return; }
+  c.beginPath();
+  c.moveTo(x+r,y); c.lineTo(x+w-r,y); c.quadraticCurveTo(x+w,y,x+w,y+r);
+  c.lineTo(x+w,y+h-r); c.quadraticCurveTo(x+w,y+h,x+w-r,y+h);
+  c.lineTo(x+r,y+h); c.quadraticCurveTo(x,y+h,x,y+h-r);
+  c.lineTo(x,y+r); c.quadraticCurveTo(x,y,x+r,y);
+  c.closePath();
+}
+
+function reroll(){
+  const pool = ROSTER.filter(h=>h.emblem && h.emblem!=='dot');
+  PICK = [];
+  const used = new Set();
+  while(PICK.length < 2 && used.size < pool.length){
+    const h = pool[Math.floor(Math.random()*pool.length)];
+    if(used.has(h.id)) continue;
+    used.add(h.id); PICK.push(h);
+  }
+  drawAll();
+}
+
+/* ---- 一个球：底色圆 + 队伍描边 + 图腾 ---- */
+function ball(c, x, y, r, hero, ringColor){
+  c.save();
+  c.shadowColor = hero.color; c.shadowBlur = r*0.55;
+  c.fillStyle = hero.color;
+  c.beginPath(); c.arc(x,y,r,0,6.283); c.fill();
+  c.restore();
+
+  c.lineWidth = Math.max(2, r*0.14);
+  c.strokeStyle = ringColor;
+  c.beginPath(); c.arc(x,y,r+c.lineWidth,0,6.283); c.stroke();
+
+  // 图腾用深/浅对比色，保证在任何角色配色上都看得清
+  drawEmblem(c, hero.emblem, x, y, r*0.52, 'rgba(255,255,255,.92)');
+}
+
+/* ---- 中间的撞击闪光 ---- */
+function clash(c, x, y, r){
+  const g = c.createRadialGradient(x,y,0,x,y,r);
+  g.addColorStop(0,'rgba(255,255,255,.95)');
+  g.addColorStop(.35,'rgba(255,224,140,.6)');
+  g.addColorStop(1,'rgba(255,180,60,0)');
+  c.fillStyle=g; c.beginPath(); c.arc(x,y,r,0,6.283); c.fill();
+
+  c.strokeStyle='rgba(255,255,255,.85)';
+  c.lineWidth=Math.max(1.5,r*0.05); c.lineCap='round';
+  for(let i=0;i<10;i++){
+    const a = i*Math.PI/5 + 0.25;
+    const r1 = r*0.5, r2 = r*(i%2 ? 1.35 : 0.95);
+    c.beginPath();
+    c.moveTo(x+Math.cos(a)*r1, y+Math.sin(a)*r1);
+    c.lineTo(x+Math.cos(a)*r2, y+Math.sin(a)*r2);
+    c.stroke();
+  }
+}
+
+/* ---- 方形图标 ---- */
+function drawIcon(c, S){
+  const bg1 = THEME_LIGHT ? '#f2f5fa' : '#0d1017';
+  const bg2 = THEME_LIGHT ? '#dbe3f0' : '#1a2133';
+  c.clearRect(0,0,S,S);
+
+  const g = c.createLinearGradient(0,0,S,S);
+  g.addColorStop(0,bg2); g.addColorStop(1,bg1);
+  roundRect(c,0,0,S,S,S*0.22); c.fillStyle=g; c.fill();
+
+  c.save(); roundRect(c,0,0,S,S,S*0.22); c.clip();
+
+  // 竞技场：一圈虚线环，暗示"场地"
+  c.strokeStyle = THEME_LIGHT ? 'rgba(60,80,120,.30)' : 'rgba(120,150,220,.28)';
+  c.lineWidth = S*0.012; c.setLineDash([S*0.05, S*0.035]);
+  c.beginPath(); c.arc(S/2,S/2,S*0.375,0,6.283); c.stroke();
+  c.setLineDash([]);
+
+  // 两个球对撞
+  const r = S*0.155, off = S*0.175;
+  if(PICK.length>=2){
+    ball(c, S/2-off, S/2-off*0.42, r, PICK[0], '#5b8cff');
+    ball(c, S/2+off, S/2+off*0.42, r, PICK[1], '#ff5d6c');
+  }
+  clash(c, S/2, S/2, S*0.13);
+
+  c.restore();
+}
+
+/* ---- 横版字标 ---- */
+function drawMark(c, W, H){
+  const bg1 = THEME_LIGHT ? '#f2f5fa' : '#0b0e15';
+  const bg2 = THEME_LIGHT ? '#e2e9f4' : '#161d2e';
+  const fg  = THEME_LIGHT ? '#0d1017' : '#ffffff';
+  const dim = THEME_LIGHT ? 'rgba(13,16,23,.55)' : 'rgba(255,255,255,.55)';
+
+  const g = c.createLinearGradient(0,0,W,H);
+  g.addColorStop(0,bg2); g.addColorStop(1,bg1);
+  c.fillStyle=g; c.fillRect(0,0,W,H);
+
+  // 左侧图标：直接复用方形图标的画法，缩放进来
+  const S = H*0.72;
+  c.save();
+  c.translate(H*0.14, H*0.14);
+  c.scale(S/512, S/512);
+  drawIcon(c, 512);
+  c.restore();
+
+  const tx = H*0.14 + S + H*0.22;
+
+  c.textBaseline = 'middle';
+  c.fillStyle = fg;
+  c.font = '700 ' + Math.round(H*0.30) + 'px "PingFang SC","Hiragino Sans GB",sans-serif';
+  c.fillText('超时空对战', tx, H*0.40);
+
+  c.fillStyle = dim;
+  c.font = '600 ' + Math.round(H*0.098) + 'px -apple-system,"Helvetica Neue",sans-serif';
+  const en = 'C R O S S - D I M E N S I O N   D U E L';
+  c.fillText(en, tx + 3, H*0.635);
+
+  // 底下一条数据说明，和 itch 页面口径一致
+  c.fillStyle = '#5b6dfa';
+  c.font = '700 ' + Math.round(H*0.075) + 'px -apple-system,"Helvetica Neue",sans-serif';
+  c.fillText('25 HEROES · 25 MECHANICS · 8 ARENAS', tx + 3, H*0.80);
+}
+
+/* ---- favicon：小尺寸下图腾会糊，所以只留两个球 + 闪光 ---- */
+function drawFav(c, S){
+  c.clearRect(0,0,S,S);
+  roundRect(c,0,0,S,S,S*0.22);
+  c.fillStyle = THEME_LIGHT ? '#e2e9f4' : '#0d1017'; c.fill();
+  c.save(); roundRect(c,0,0,S,S,S*0.22); c.clip();
+  const r = S*0.20, off = S*0.19;
+  if(PICK.length>=2){
+    c.fillStyle=PICK[0].color; c.beginPath(); c.arc(S/2-off,S/2-off*0.42,r,0,6.283); c.fill();
+    c.fillStyle=PICK[1].color; c.beginPath(); c.arc(S/2+off,S/2+off*0.42,r,0,6.283); c.fill();
+  }
+  clash(c, S/2, S/2, S*0.20);
+  c.restore();
+}
+
+function drawAll(){
+  drawIcon(document.getElementById('icon').getContext('2d'), 512);
+  drawMark(document.getElementById('mark').getContext('2d'), 1200, 400);
+  drawFav (document.getElementById('fav' ).getContext('2d'), 64);
+}
+
+/* ---- 下载。scale>1 时用离屏画布按倍数重画，不是把小图放大 ---- */
+function dl(id, name, scale){
+  scale = scale || 1;
+  let src = document.getElementById(id);
+  if(scale !== 1){
+    const off = document.createElement('canvas');
+    off.width = src.width*scale; off.height = src.height*scale;
+    const oc = off.getContext('2d');
+    oc.setTransform(scale,0,0,scale,0,0);
+    if(id==='icon') drawIcon(oc, 512);
+    else if(id==='fav') drawFav(oc, 64);
+    else drawMark(oc, 1200, 400);
+    src = off;
+  }
+  const a = document.createElement('a');
+  a.download = name;
+  a.href = src.toDataURL('image/png');
+  a.click();
+}
+
+reroll();
+</script>
+</body>
+</html>
