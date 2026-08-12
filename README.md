@@ -1,4 +1,4 @@
-<p align="center">  
+<p align="center">
   <img src="figures/logo-wordmark.png" alt="超时空对战 · Cross-Dimension Duel" width="620">
 </p>
 
